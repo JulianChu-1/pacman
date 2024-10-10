@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # sampleAgents.py
 # parsons/07-oct-2017
 #
@@ -26,6 +27,7 @@
 # The agents here are extensions written by Simon Parsons, based on the code in
 # pacmanAgents.py
 
+from time import sleep
 from pacman import Directions
 from game import Agent
 import api
@@ -138,37 +140,60 @@ class CornerSeekingAgent(Agent):
         self.corners = None
         self.visitedCorners = []
         self.nowCorner = None
-        
+        self.lastPosition = None
+
     def getAction(self, state):
         if len(self.visitedCorners) == 4:
             self.visitedCorners = []
 
         if self.corners is None:
-            self.corners = api.corners(state)
-        
+            self.corners = [(18,1),(1,1),(1,9),(18,9)]
+
         if self.nowCorner is None:
             for corner in self.corners:
                 if corner not in self.visitedCorners:
                     self.nowCorner = corner
-        
+                    # print nowCorner
+
         selfX, selfY = api.whereAmI(state)
         targetX, targetY = self.nowCorner
         legal = api.legalActions(state)
+        walls = api.walls(state) 
+        # print selfX
 
-        if selfX < targetX:
-            direction = Directions.EAST
-        elif selfX > targetX:
-            direction = Directions.WEST
-        elif selfY < targetY:
-            direction = Directions.NORTH
-        else:
-            direction = Directions.SOUTH
-        
-        if direction in legal:
-            return api.makeMove(direction, legal)
+        if (selfX, selfY) == self.nowCorner:
+            self.visitedCorners.append(self.nowCorner)
+            self.nowCorner = None
+            return api.makeMove(Directions.STOP,legal)
+
+        bestDirection = None
+        bestDistance = float('inf')
+
+        for direction in legal:
+            if direction == Directions.NORTH:
+                nextX, nextY = selfX, selfY + 1
+            elif direction == Directions.SOUTH:
+                nextX, nextY = selfX, selfY - 1
+            elif direction == Directions.EAST:
+                nextX, nextY = selfX + 1, selfY
+            elif direction == Directions.WEST:
+                nextX, nextY = selfX - 1, selfY
+            else:
+                continue
+
+            if (nextX, nextY) not in walls and (nextX, nextY) != self.lastPosition:
+                distance = abs(nextX - targetX) + abs(nextY - targetY)
+                if distance < bestDistance:
+                    bestDistance = distance
+                    bestDirection = direction
+
+        if bestDirection:
+            self.lastPosition = (selfX, selfY)
+            return api.makeMove(bestDirection, legal)
         else:
             direction = random.choice(legal)
-                
+            self.lastPosition = (selfX, selfY)
+            return api.makeMove(direction, legal)
             
 
 
