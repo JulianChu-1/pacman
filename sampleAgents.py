@@ -194,7 +194,115 @@ class CornerSeekingAgent(Agent):
             direction = random.choice(legal)
             self.lastPosition = (selfX, selfY)
             return api.makeMove(direction, legal)
-            
 
+class ForgeSafelyAgent(Agent):
+    def __init__(self):
+        self.last = Directions.STOP
+        self.corners = None
+        self.visitedCorners = []
+        self.nowCorner = None
+        self.lastPosition = None
+        self.state = 'foraging'
+        self.ghostDistanceThreshold = 3
+    
+    def getAction(self, state):
+        # if len(self.visitedCorners) == 4:
+        #     pass
 
+        if self.corners is None:
+            self.corners = [(18,1), (1,1), (1,9), (18,9)]
+        
+        if self.nowCorner is None:
+            for corner in self.corners:
+                if corner not in self.visitedCorners:
+                    self.nowCorner = corner
+        
+        selfX, selfY = api.whereAmI(state)
+        legal = api.legalActions(state)
+        walls = api.walls(state)
+        ghostPositions = api.ghosts(state)
+        food = api.food(state)
+        distancesToGhosts = api.ghosts(state)
+        # print food
 
+        if any(dist <= self.ghostDistanceThreshold for dist in distancesToGhosts):
+            self.state = 'surviving'
+        else:
+            self.state = 'foraging'
+
+        if self.state == 'surviving':
+            return self.survivalMode(legal, ghostPositions, walls)
+        else:
+            return self.foragingMode(legal, food, walls, selfX, selfY)
+        
+    def foragingMode(self, legal, food, walls, selfX, selfY):
+        if (selfX, selfY) == self.nowCorner:
+            self.visitedCorners.append(self.nowCorner)
+            self.nowCorner = None
+            return api.makeMove(Directions.STOP, legal)
+
+        bestDirection = None
+        bestDistance = float('inf')
+
+        if len(self.visitedCorners) < 4:
+            targetX, targetY = self.nowCorner
+        else:
+            if food == []:
+                targetX, targetY = random.choice(self.corners)
+            else:
+                targetX, targetY = random.choice(food)
+
+        for direction in legal:
+            if direction == Directions.NORTH:
+                nextX, nextY = selfX, selfY + 1
+            elif direction == Directions.SOUTH:
+                nextX, nextY = selfX, selfY - 1
+            elif direction == Directions.EAST:
+                nextX, nextY = selfX + 1, selfY
+            elif direction == Directions.WEST:
+                nextX, nextY = selfX - 1, selfY
+            else:
+                continue
+
+            if (nextX, nextY) not in walls and (nextX, nextY) != self.lastPosition:
+                distance = abs(nextX - targetX) + abs(nextY - targetY)
+                if distance < bestDistance:
+                    bestDistance = distance
+                    bestDirection = direction
+
+        if bestDirection:
+            self.lastPosition = (selfX, selfY)
+            return api.makeMove(bestDirection, legal)
+        else:
+            direction = random.choice(legal)
+            self.lastPosition = (selfX, selfY)
+            return api.makeMove(direction, legal)
+
+    def survivalMode(self, legal, ghostPositions, walls):
+        bestDirection = None
+        maxDistance = -float('inf')
+        selfX, selfY = api.whereAmI(self.state)
+
+        for direction in legal:
+            if direction == Directions.NORTH:
+                nextX, nextY = selfX, selfY + 1
+            elif direction == Directions.SOUTH:
+                nextX, nextY = selfX, selfY - 1
+            elif direction == Directions.EAST:
+                nextX, nextY = selfX + 1, selfY
+            elif direction == Directions.WEST:
+                nextX, nextY = selfX - 1, selfY
+            else:
+                continue
+
+            if (nextX, nextY) not in walls:
+                distance = min([abs(nextX - gx) + abs(nextY - gy) for gx, gy in ghostPositions])
+                if distance > maxDistance:
+                    maxDistance = distance
+                    bestDirection = direction
+
+        if bestDirection:
+            return api.makeMove(bestDirection, legal)
+        else:
+            direction = random.choice(legal)
+            return api.makeMove(direction, legal)
